@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 const navItems = [
   { to: "/calendar", label: "캘린더" },
   { to: "/transactions", label: "거래내역" },
+  { to: "/categories", label: "카테고리" },
   { to: "/cards", label: "카드" },
   { to: "/accounts", label: "계좌" },
 ];

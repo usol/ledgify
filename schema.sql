@@ -61,6 +61,40 @@ create index if not exists idx_transactions_user on public.transactions(user_id)
 create index if not exists idx_cards_user        on public.cards(user_id);
 create index if not exists idx_accounts_user     on public.accounts(user_id);
 
+-- ---------------------------------------------------------------------
+-- 5. categories : 수입/지출 카테고리 (2-depth, 전역 공유)
+--    parent_id 가 null 이면 1-depth(상위), 값이 있으면 2-depth(하위)
+--    user_id 가 없다 → 모든 사용자가 공유하며 누구나 관리 가능
+-- ---------------------------------------------------------------------
+create table if not exists public.categories (
+  id         uuid primary key default gen_random_uuid(),
+  type       text not null check (type in ('income', 'expense')),
+  name       text not null,
+  parent_id  uuid references public.categories(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_categories_parent on public.categories(parent_id);
+
+-- 같은 depth(동일 parent + type) 내 이름 중복 방지. 상위가 다르면 같은 이름 허용.
+create unique index if not exists uq_categories_top
+  on public.categories(type, name) where parent_id is null;
+create unique index if not exists uq_categories_child
+  on public.categories(parent_id, name) where parent_id is not null;
+
+-- 거래에 카테고리 연결 (상위/하위 어느 쪽이든 지정 가능). 카테고리 삭제 시 null.
+alter table public.transactions
+  add column if not exists category_id uuid references public.categories(id) on delete set null;
+create index if not exists idx_transactions_category on public.transactions(category_id);
+
+-- 기본 상위 카테고리 시드 (테이블이 비어있을 때만)
+insert into public.categories (type, name)
+select v.type, v.name from (values
+  ('expense','식비'), ('expense','교통'), ('expense','주거'), ('expense','쇼핑'),
+  ('expense','의료'), ('expense','여가'), ('expense','교육'), ('expense','기타'),
+  ('income','급여'), ('income','용돈'), ('income','이자'), ('income','기타')
+) as v(type, name)
+where not exists (select 1 from public.categories);
+
 -- =====================================================================
 -- 역할별 테이블 권한 (GRANT)
 --   RLS 와 별개로 PostgreSQL 테이블 권한이 필요하다.
@@ -91,6 +125,7 @@ alter table public.profiles     enable row level security;
 alter table public.accounts     enable row level security;
 alter table public.cards        enable row level security;
 alter table public.transactions enable row level security;
+alter table public.categories   enable row level security;
 
 -- ---- helper : 현재 사용자가 admin 인지 확인 -------------------------
 create or replace function public.is_admin()
@@ -170,6 +205,20 @@ create policy "transactions_update" on public.transactions
 drop policy if exists "transactions_delete" on public.transactions;
 create policy "transactions_delete" on public.transactions
   for delete using (auth.uid() = user_id);
+
+-- categories : 로그인 사용자면 읽기/쓰기 모두 가능 (전역 공유 + 공동 관리)
+drop policy if exists "categories_select" on public.categories;
+create policy "categories_select" on public.categories
+  for select using (auth.role() = 'authenticated');
+drop policy if exists "categories_insert" on public.categories;
+create policy "categories_insert" on public.categories
+  for insert with check (auth.role() = 'authenticated');
+drop policy if exists "categories_update" on public.categories;
+create policy "categories_update" on public.categories
+  for update using (auth.role() = 'authenticated');
+drop policy if exists "categories_delete" on public.categories;
+create policy "categories_delete" on public.categories
+  for delete using (auth.role() = 'authenticated');
 
 -- =====================================================================
 -- 최초 관리자 설정

@@ -96,7 +96,10 @@ def update_transaction(
     tx_id: str, body: TransactionUpdate, user: CurrentUser = Depends(get_current_user)
 ):
     db = get_user_client(user.token)
-    payload = {k: v for k, v in body.model_dump(mode="json").items() if v is not None}
+    # exclude_unset: 클라이언트가 실제로 보낸 필드만 반영 (null 로 비우기 허용)
+    payload = body.model_dump(mode="json", exclude_unset=True)
+    if not payload:
+        raise HTTPException(status_code=400, detail="수정할 내용이 없습니다.")
     res = db.table("transactions").update(payload).eq("id", tx_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="거래를 찾을 수 없거나 권한이 없습니다.")

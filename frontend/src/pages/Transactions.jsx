@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { formatWon, transactionsApi } from "../api";
+import { categoriesApi, categoryLabel, formatWon, transactionsApi } from "../api";
 import TransactionModal from "../components/TransactionModal";
 
 export default function Transactions() {
@@ -7,6 +7,7 @@ export default function Transactions() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [rows, setRows] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
@@ -18,6 +19,10 @@ export default function Transactions() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month]);
+
+  useEffect(() => {
+    categoriesApi.list().then((res) => setCategories(res.data));
+  }, []);
 
   const handleEdit = (tx) => {
     setEditing(tx);
@@ -69,7 +74,9 @@ export default function Transactions() {
           <div key={tx.id} className="flex items-center justify-between rounded-xl border bg-white px-4 py-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-900">{tx.category || "기타"}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {categoryLabel(tx.category_id, categories) || tx.category || "기타"}
+                </span>
                 {tx.description && (
                   <span className="truncate text-xs text-gray-400">· {tx.description}</span>
                 )}

@@ -51,6 +51,28 @@ export const cardsApi = {
   remove: (id) => api.delete(`/api/cards/${id}`),
 };
 
+// ----------------------------- categories -----------------------------
+export const categoriesApi = {
+  list: () => api.get("/api/categories"),
+  create: (payload) => api.post("/api/categories", payload),
+  update: (id, name) => api.patch(`/api/categories/${id}`, { name }),
+  // reassignTo 가 있으면 사용 중인 거래를 해당 카테고리로 이관 후 삭제
+  remove: (id, reassignTo) =>
+    api.delete(`/api/categories/${id}`, {
+      params: reassignTo ? { reassign_to: reassignTo } : {},
+    }),
+};
+
+// 카테고리 표시명 헬퍼: "상위 > 하위" 또는 "상위"
+export const categoryLabel = (catId, categories) => {
+  if (!catId) return "";
+  const map = Object.fromEntries(categories.map((c) => [c.id, c]));
+  const c = map[catId];
+  if (!c) return "";
+  if (c.parent_id && map[c.parent_id]) return `${map[c.parent_id].name} > ${c.name}`;
+  return c.name;
+};
+
 // ----------------------------- transactions -----------------------------
 export const transactionsApi = {
   list: (params) => api.get("/api/transactions", { params }),

@@ -72,7 +72,8 @@ class TransactionCreate(BaseModel):
     transaction_date: date
     account_id: Optional[str] = None
     card_id: Optional[str] = None
-    category: Optional[str] = None
+    category: Optional[str] = None  # 레거시 텍스트 (하위호환)
+    category_id: Optional[str] = None  # 카테고리(상위/하위) FK
     description: Optional[str] = None
 
 
@@ -83,4 +84,16 @@ class TransactionUpdate(BaseModel):
     account_id: Optional[str] = None
     card_id: Optional[str] = None
     category: Optional[str] = None
+    category_id: Optional[str] = None
     description: Optional[str] = None
+
+
+# ----------------------------- Categories -----------------------------
+class CategoryCreate(BaseModel):
+    type: Literal["income", "expense"]
+    name: str
+    parent_id: Optional[str] = None  # null 이면 1-depth(상위), 값이 있으면 2-depth(하위)
+
+
+class CategoryUpdate(BaseModel):
+    name: str

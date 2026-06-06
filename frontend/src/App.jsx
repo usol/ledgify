@@ -5,6 +5,7 @@ import PrivateRoute from "./components/PrivateRoute";
 import Accounts from "./pages/Accounts";
 import Calendar from "./pages/Calendar";
 import Cards from "./pages/Cards";
+import Categories from "./pages/Categories";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import Transactions from "./pages/Transactions";
@@ -25,6 +26,7 @@ export default function App() {
 
       <Route path="/calendar" element={<Protected><Calendar /></Protected>} />
       <Route path="/transactions" element={<Protected><Transactions /></Protected>} />
+      <Route path="/categories" element={<Protected><Categories /></Protected>} />
       <Route path="/cards" element={<Protected><Cards /></Protected>} />
       <Route path="/accounts" element={<Protected><Accounts /></Protected>} />
 
