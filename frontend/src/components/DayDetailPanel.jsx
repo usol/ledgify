@@ -35,8 +35,8 @@ export default function DayDetailPanel({ date, transactions = [], categories = [
           <span className="text-sm font-medium text-gray-900">
             {categoryLabel(t.category_id, categories) || t.category || "기타"}
           </span>
-          {t.description && (
-            <span className="ml-2 truncate text-xs text-gray-400">{t.description}</span>
+          {t.summary && (
+            <span className="ml-2 truncate text-xs text-gray-500">{t.summary}</span>
           )}
         </span>
         <span className={`shrink-0 font-semibold ${t.type === "income" ? "text-blue-600" : "text-red-600"}`}>

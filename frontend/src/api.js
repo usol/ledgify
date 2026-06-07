@@ -77,6 +77,8 @@ export const categoryLabel = (catId, categories) => {
 export const transactionsApi = {
   list: (params) => api.get("/api/transactions", { params }),
   summary: (params) => api.get("/api/transactions/summary", { params }),
+  // 개요 자동완성용: 기존 입력된 개요 목록 (최근순 distinct)
+  summaries: (q) => api.get("/api/transactions/summaries", { params: q ? { q } : {} }),
   create: (payload) => api.post("/api/transactions", payload),
   update: (id, payload) => api.patch(`/api/transactions/${id}`, payload),
   remove: (id) => api.delete(`/api/transactions/${id}`),

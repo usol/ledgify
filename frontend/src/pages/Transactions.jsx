@@ -77,8 +77,8 @@ export default function Transactions() {
                 <span className="text-sm font-medium text-gray-900">
                   {categoryLabel(tx.category_id, categories) || tx.category || "기타"}
                 </span>
-                {tx.description && (
-                  <span className="truncate text-xs text-gray-400">· {tx.description}</span>
+                {tx.summary && (
+                  <span className="truncate text-xs text-gray-500">· {tx.summary}</span>
                 )}
               </div>
               <p className="mt-0.5 text-xs text-gray-400">{tx.transaction_date}</p>

@@ -87,6 +87,58 @@ def test_summary_aggregates(client, app, make_user, fake_client_factory, monkeyp
         app.dependency_overrides.clear()
 
 
+def test_create_transaction_persists_summary(client, app, make_user, monkeypatch):
+    _override_auth(app, make_user)
+    captured = {}
+
+    class Cap:
+        def table(self, _):
+            return self
+        def insert(self, payload):
+            captured.update(payload)
+            return self
+        def execute(self):
+            return type("R", (), {"data": [{**captured, "id": "new"}]})()
+
+    monkeypatch.setattr(tx_router, "get_user_client", lambda token: Cap())
+    try:
+        res = client.post(
+            "/api/transactions",
+            json={
+                "type": "expense",
+                "amount": 8000,
+                "transaction_date": "2026-06-06",
+                "summary": "점심",
+                "description": "여러 줄\n메모",
+            },
+        )
+        assert res.status_code == 201
+        assert captured["summary"] == "점심"
+        assert captured["description"] == "여러 줄\n메모"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_summary_suggestions_distinct_recent(client, app, make_user, fake_client_factory, monkeypatch):
+    _override_auth(app, make_user)
+    rows = [
+        {"summary": "점심", "created_at": "2026-06-03"},
+        {"summary": "월급", "created_at": "2026-06-02"},
+        {"summary": "점심", "created_at": "2026-06-01"},  # 중복 -> 1회만
+        {"summary": "   ", "created_at": "2026-06-01"},   # 공백 제외
+        {"summary": None, "created_at": "2026-06-01"},    # null 제외
+    ]
+    monkeypatch.setattr(
+        tx_router, "get_user_client", lambda token: fake_client_factory({"transactions": rows})
+    )
+    try:
+        res = client.get("/api/transactions/summaries")
+        assert res.status_code == 200
+        assert res.json() == ["점심", "월급"]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_delete_not_found_returns_404(client, app, make_user, fake_client_factory, monkeypatch):
     _override_auth(app, make_user)
     # RLS 로 본인 데이터가 아니면 delete 결과 data 가 빈 리스트 -> 404

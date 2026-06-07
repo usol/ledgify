@@ -74,7 +74,8 @@ class TransactionCreate(BaseModel):
     card_id: Optional[str] = None
     category: Optional[str] = None  # 레거시 텍스트 (하위호환)
     category_id: Optional[str] = None  # 카테고리(상위/하위) FK
-    description: Optional[str] = None
+    summary: Optional[str] = None  # 개요(짧은 제목, 자동완성 대상)
+    description: Optional[str] = None  # 메모(여러 줄 가능)
 
 
 class TransactionUpdate(BaseModel):
@@ -85,6 +86,7 @@ class TransactionUpdate(BaseModel):
     card_id: Optional[str] = None
     category: Optional[str] = None
     category_id: Optional[str] = None
+    summary: Optional[str] = None
     description: Optional[str] = None
 
 

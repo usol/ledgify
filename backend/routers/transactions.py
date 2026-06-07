@@ -80,6 +80,37 @@ def summary(
     }
 
 
+@router.get("/summaries")
+def summary_suggestions(
+    user: CurrentUser = Depends(get_current_user),
+    q: Optional[str] = Query(None),
+):
+    """개요(summary) 자동완성: 기존에 입력된 개요들을 최근순 중복제거하여 반환."""
+    db = get_user_client(user.token)
+    rows = (
+        db.table("transactions")
+        .select("summary, created_at")
+        .order("created_at", desc=True)
+        .limit(500)
+        .execute()
+        .data
+        or []
+    )
+    needle = (q or "").strip().lower()
+    seen: list[str] = []
+    for r in rows:
+        s = (r.get("summary") or "").strip()
+        if not s:
+            continue
+        if needle and needle not in s.lower():
+            continue
+        if s not in seen:
+            seen.append(s)
+        if len(seen) >= 50:
+            break
+    return seen
+
+
 @router.post("", status_code=201)
 def create_transaction(
     body: TransactionCreate, user: CurrentUser = Depends(get_current_user)

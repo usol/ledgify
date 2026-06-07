@@ -8,6 +8,7 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
   const [accounts, setAccounts] = useState([]);
   const [cards, setCards] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [summaries, setSummaries] = useState([]); // 개요 자동완성 후보
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -16,6 +17,7 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
     amount: "",
     transaction_date: defaultDate || todayStr(),
     category_id: "",
+    summary: "",
     description: "",
     account_id: "",
     card_id: "",
@@ -24,19 +26,24 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
   useEffect(() => {
     if (!open) return;
     setError("");
-    Promise.all([accountsApi.list(), cardsApi.list(), categoriesApi.list()]).then(
-      ([a, c, cat]) => {
-        setAccounts(a.data);
-        setCards(c.data);
-        setCategories(cat.data);
-      }
-    );
+    Promise.all([
+      accountsApi.list(),
+      cardsApi.list(),
+      categoriesApi.list(),
+      transactionsApi.summaries(),
+    ]).then(([a, c, cat, sug]) => {
+      setAccounts(a.data);
+      setCards(c.data);
+      setCategories(cat.data);
+      setSummaries(sug.data || []);
+    });
     if (initial) {
       setForm({
         type: initial.type ?? "expense",
         amount: initial.amount?.toString() ?? "",
         transaction_date: initial.transaction_date ?? defaultDate ?? todayStr(),
         category_id: initial.category_id ?? "",
+        summary: initial.summary ?? "",
         description: initial.description ?? "",
         account_id: initial.account_id ?? "",
         card_id: initial.card_id ?? "",
@@ -47,6 +54,7 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
         type: "expense",
         amount: "",
         category_id: "",
+        summary: "",
         description: "",
         account_id: "",
         card_id: "",
@@ -80,11 +88,16 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
       setError("금액을 올바르게 입력하세요.");
       return;
     }
+    if (!selectedParentId) {
+      setError("카테고리(상위)를 선택하세요.");
+      return;
+    }
     const payload = {
       type: form.type,
       amount: parseInt(form.amount, 10),
       transaction_date: form.transaction_date,
       category_id: form.category_id || null,
+      summary: form.summary.trim() || null,
       description: form.description || null,
       account_id: form.account_id || null,
       card_id: form.card_id || null,
@@ -176,13 +189,16 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-sm text-gray-600">카테고리</label>
+              <label className="mb-1 block text-sm text-gray-600">
+                카테고리 <span className="text-red-500">*</span>
+              </label>
               <select
                 value={selectedParentId}
                 onChange={(e) => onParentChange(e.target.value)}
+                required
                 className="w-full rounded-lg border px-3 py-2"
               >
-                <option value="">선택 안 함</option>
+                <option value="">선택</option>
                 {parents.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -206,6 +222,24 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
                 ))}
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm text-gray-600">개요</label>
+            <input
+              type="text"
+              list="summary-suggestions"
+              value={form.summary}
+              onChange={(e) => set("summary", e.target.value)}
+              className="w-full rounded-lg border px-3 py-2"
+              placeholder="예: 점심, 월급, 마트 장보기"
+              autoComplete="off"
+            />
+            <datalist id="summary-suggestions">
+              {summaries.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -243,12 +277,12 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
 
           <div>
             <label className="mb-1 block text-sm text-gray-600">메모</label>
-            <input
-              type="text"
+            <textarea
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
-              className="w-full rounded-lg border px-3 py-2"
-              placeholder="내용"
+              rows={3}
+              className="w-full resize-y rounded-lg border px-3 py-2"
+              placeholder="여러 줄 메모를 입력할 수 있습니다"
             />
           </div>
 

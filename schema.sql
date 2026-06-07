@@ -51,7 +51,8 @@ create table if not exists public.transactions (
   type             text not null check (type in ('income', 'expense')),
   amount           integer not null check (amount >= 0),
   category         text,
-  description      text,
+  summary          text,        -- 개요(짧은 제목, 자동완성 대상)
+  description      text,        -- 메모(여러 줄 가능)
   transaction_date date not null default current_date,
   created_at       timestamptz not null default now()
 );
