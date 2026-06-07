@@ -1,12 +1,25 @@
 # ledgify — 공유 가계부
 
+> **Ledgify** = **Ledger**(회계 장부) + **-ify**(~화 하다).
+> "복잡한 장부 관리를 쉽고 트렌디하게 만들다"라는 의미를 담았습니다.
+
 여러 사용자가 **하나의 가계부를 공유**하는 웹 애플리케이션.
-관리자가 구성원을 추가/관리하고, 모든 구성원이 같은 거래·계좌·카드 데이터를 함께 봅니다.
+관리자가 구성원을 추가/관리하고, 모든 구성원이 같은 거래·계좌·카드·카테고리 데이터를 함께 봅니다.
 
 - **백엔드**: Python 3.11 + FastAPI
-- **프론트엔드**: React 18 + Vite + TailwindCSS
+- **프론트엔드**: React 18 + Vite + TailwindCSS (드래그 정렬은 `@dnd-kit`)
 - **DB / 인증**: Supabase (PostgreSQL + Auth)
 - **배포**: 백엔드 → Railway, 프론트엔드 → Vercel
+
+---
+
+## 주요 기능
+
+- **거래 입력**: 개요(summary, 자동완성) · 금액 · 카테고리(필수, 2-depth) · 메모(여러 줄). 지출은 **결제수단**(카드 → 계좌 → 현금 순)을 단일 선택으로 통합, 수입은 계좌만 선택.
+- **카테고리 2-depth 관리**: 상위/하위 카테고리, 이관 후 삭제.
+- **노출 순서 드래그 정렬**: 계좌·카드·카테고리를 관리 화면에서 드래그(`@dnd-kit`, 모바일 터치 지원)로 정렬하면 거래 입력 팝업의 목록 순서도 동일하게 반영(`sort_order`).
+- **계좌·카드 인라인 수정**, 모든 삭제는 **확인(confirm) 후 실행**.
+- **캘린더**: 월별 집계(수입 파랑 / 지출 빨강 / 합계 초록), 날짜 셀 고정 높이, 날짜별 거래 인라인 목록. 화면 높이가 충분할 때(`tall`, ≥600px)는 캘린더 고정 + 목록만 스크롤.
 
 ---
 
@@ -22,25 +35,27 @@ ledgify/
 │   ├── routers/
 │   │   ├── auth.py         # /auth/login, /auth/logout, /auth/me
 │   │   ├── users.py        # /api/users (관리자 전용 구성원 관리)
-│   │   ├── accounts.py     # /api/accounts CRUD
-│   │   ├── cards.py        # /api/cards CRUD
-│   │   └── transactions.py # /api/transactions CRUD + summary
+│   │   ├── accounts.py     # /api/accounts CRUD + 순서 변경(PUT /order)
+│   │   ├── cards.py        # /api/cards CRUD + 순서 변경(PUT /order)
+│   │   ├── categories.py   # /api/categories CRUD(2-depth) + 순서 변경(PUT /order)
+│   │   └── transactions.py # /api/transactions CRUD + summary / summaries
 │   ├── requirements.txt
 │   ├── Procfile / railway.json
 │   └── .env.example
 ├── frontend/               # React + Vite
 │   ├── src/
-│   │   ├── pages/          # Login, Calendar, Transactions, Cards, Accounts, Settings
-│   │   ├── components/     # Layout, PrivateRoute, AdminRoute, TransactionModal, CalendarGrid
+│   │   ├── pages/          # Login, Calendar, Transactions, Cards, Accounts, Categories, Settings
+│   │   ├── components/     # Layout, PrivateRoute, AdminRoute, TransactionModal,
+│   │   │                   #   CalendarGrid, DayDetailPanel, SortableList(@dnd-kit)
 │   │   ├── context/AuthContext.jsx
 │   │   ├── api.js          # axios + 토큰 인터셉터
 │   │   ├── supabaseClient.js
 │   │   └── App.jsx
 │   ├── package.json / vite.config.js
-│   ├── tailwind.config.js / postcss.config.js
+│   ├── tailwind.config.js / postcss.config.js   # 커스텀 screen `tall`(min-height 600px)
 │   ├── vercel.json
 │   └── .env.example
-└── schema.sql              # 테이블 + RLS
+└── schema.sql              # 테이블 + RLS (+ accounts/cards/categories.sort_order)
 ```
 
 ---
@@ -139,7 +154,7 @@ npm run dev                   # http://localhost:5173
 - 관리자만 **설정** 페이지에서 구성원 추가/이름변경/삭제 가능. 본인(관리자) 계정은 삭제 불가.
 - 로그인: 이메일 + 비밀번호 (Supabase Auth). 세션은 localStorage 에 유지(`supabase-js`).
 - 비로그인 시 모든 페이지 → `/login` 리다이렉트 (`PrivateRoute`), `/settings` 는 관리자만(`AdminRoute`).
-- **데이터 공유**: 모든 거래/계좌/카드는 전체 구성원이 **읽기** 공유. **수정/삭제는 본인 데이터만** (RLS + 백엔드가 요청자 JWT 로 강제).
+- **데이터 공유**: 모든 거래/계좌/카드/카테고리는 전체 구성원이 **읽기** 공유. **수정/삭제는 본인 데이터만** (RLS + 백엔드가 요청자 JWT 로 강제).
 
 ---
 
@@ -152,6 +167,11 @@ npm run dev                   # http://localhost:5173
 | GET | `/auth/me` | 현재 사용자 |
 | GET/POST/PATCH/DELETE | `/api/users` `/api/users/{id}` | 구성원 관리 (관리자) |
 | GET/POST/PATCH/DELETE | `/api/accounts` | 계좌 |
+| PUT | `/api/accounts/order` | 계좌 노출 순서 변경 |
 | GET/POST/PATCH/DELETE | `/api/cards` | 카드 |
+| PUT | `/api/cards/order` | 카드 노출 순서 변경 |
+| GET/POST/PATCH/DELETE | `/api/categories` | 카테고리 (2-depth) |
+| PUT | `/api/categories/order` | 카테고리 노출 순서 변경 |
 | GET/POST/PATCH/DELETE | `/api/transactions` | 거래 |
 | GET | `/api/transactions/summary?year=&month=&user_id=` | 월별 합계 + 날짜별 집계 |
+| GET | `/api/transactions/summaries` | 다중 월 집계 |
