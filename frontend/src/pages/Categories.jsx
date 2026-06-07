@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { categoriesApi } from "../api";
+import SortableList, { DragHandle } from "../components/SortableList";
 
 const TYPES = [
   { key: "expense", label: "지출", color: "text-red-600" },
@@ -23,8 +24,21 @@ export default function Categories() {
     load();
   }, []);
 
-  const parentsOf = (type) => cats.filter((c) => c.type === type && !c.parent_id);
-  const childrenOf = (parentId) => cats.filter((c) => c.parent_id === parentId);
+  const byOrder = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  const parentsOf = (type) => cats.filter((c) => c.type === type && !c.parent_id).sort(byOrder);
+  const childrenOf = (parentId) => cats.filter((c) => c.parent_id === parentId).sort(byOrder);
+
+  // 같은 그룹 내 순서 변경 (상위끼리 또는 한 부모의 하위끼리). 낙관적으로 sort_order 갱신.
+  const reorderGroup = async (ordered) => {
+    const idToOrder = new Map(ordered.map((c, i) => [c.id, i]));
+    setCats((prev) => prev.map((c) => (idToOrder.has(c.id) ? { ...c, sort_order: idToOrder.get(c.id) } : c)));
+    try {
+      await categoriesApi.reorder(ordered.map((c) => c.id));
+    } catch (e) {
+      setError(e.response?.data?.detail || "순서 변경에 실패했습니다.");
+      load();
+    }
+  };
 
   const addParent = async (type) => {
     const name = (newParent[type] || "").trim();
@@ -65,6 +79,7 @@ export default function Categories() {
 
   // 삭제: 먼저 이관 없이 시도 → 사용 중이면 이관 모달
   const tryDelete = async (cat) => {
+    if (!confirm(`'${cat.name}' 카테고리를 삭제할까요?`)) return;
     try {
       await categoriesApi.remove(cat.id);
       load();
@@ -154,107 +169,123 @@ export default function Categories() {
             </button>
           </div>
 
-          <div className="space-y-2">
-            {parentsOf(t.key).length === 0 && (
-              <p className="text-sm text-gray-400">등록된 카테고리가 없습니다.</p>
-            )}
-            {parentsOf(t.key).map((p) => (
-              <div key={p.id} className="rounded-xl border bg-white p-3">
-                {/* 상위 행 */}
-                <div className="flex items-center justify-between">
-                  {editId === p.id ? (
-                    <input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && saveRename(p.id)}
-                      className="rounded-lg border px-2 py-1 text-sm"
-                      autoFocus
-                    />
-                  ) : (
-                    <span className="font-semibold text-gray-900">{p.name}</span>
-                  )}
-                  <div className="flex items-center gap-2 text-xs">
-                    {editId === p.id ? (
-                      <>
-                        <button onClick={() => saveRename(p.id)} className="font-semibold text-blue-600">저장</button>
-                        <button onClick={() => setEditId(null)} className="text-gray-400">취소</button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setEditId(p.id);
-                          setEditName(p.name);
-                        }}
-                        className="text-gray-400 hover:text-gray-700"
-                      >
-                        이름변경
-                      </button>
-                    )}
-                    <button onClick={() => tryDelete(p)} className="text-gray-400 hover:text-red-600">
-                      삭제
-                    </button>
-                  </div>
-                </div>
-
-                {/* 하위 카테고리들 */}
-                <div className="mt-2 space-y-1 pl-4">
-                  {childrenOf(p.id).map((c) => (
-                    <div key={c.id} className="flex items-center justify-between border-l-2 pl-3">
-                      {editId === c.id ? (
+          {parentsOf(t.key).length === 0 ? (
+            <p className="text-sm text-gray-400">등록된 카테고리가 없습니다.</p>
+          ) : (
+            <SortableList
+              items={parentsOf(t.key)}
+              onReorder={reorderGroup}
+              renderItem={(p, handle) => (
+                <div className="rounded-xl border bg-white p-3">
+                  {/* 상위 행 */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <DragHandle handle={handle} />
+                      {editId === p.id ? (
                         <input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && saveRename(c.id)}
+                          onKeyDown={(e) => e.key === "Enter" && saveRename(p.id)}
                           className="rounded-lg border px-2 py-1 text-sm"
                           autoFocus
                         />
                       ) : (
-                        <span className="text-sm text-gray-700">{c.name}</span>
+                        <span className="font-semibold text-gray-900">{p.name}</span>
                       )}
-                      <div className="flex items-center gap-2 text-xs">
-                        {editId === c.id ? (
-                          <>
-                            <button onClick={() => saveRename(c.id)} className="font-semibold text-blue-600">저장</button>
-                            <button onClick={() => setEditId(null)} className="text-gray-400">취소</button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setEditId(c.id);
-                              setEditName(c.name);
-                            }}
-                            className="text-gray-400 hover:text-gray-700"
-                          >
-                            이름변경
-                          </button>
-                        )}
-                        <button onClick={() => tryDelete(c)} className="text-gray-400 hover:text-red-600">
-                          삭제
-                        </button>
-                      </div>
                     </div>
-                  ))}
+                    <div className="flex items-center gap-2 text-xs">
+                      {editId === p.id ? (
+                        <>
+                          <button onClick={() => saveRename(p.id)} className="font-semibold text-blue-600">저장</button>
+                          <button onClick={() => setEditId(null)} className="text-gray-400">취소</button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditId(p.id);
+                            setEditName(p.name);
+                          }}
+                          className="text-gray-400 hover:text-gray-700"
+                        >
+                          이름변경
+                        </button>
+                      )}
+                      <button onClick={() => tryDelete(p)} className="text-gray-400 hover:text-red-600">
+                        삭제
+                      </button>
+                    </div>
+                  </div>
 
-                  {/* 하위 추가 */}
-                  <div className="flex gap-2 pt-1">
-                    <input
-                      value={childInput[p.id] || ""}
-                      onChange={(e) => setChildInput((s) => ({ ...s, [p.id]: e.target.value }))}
-                      onKeyDown={(e) => e.key === "Enter" && addChild(p)}
-                      placeholder="하위 카테고리 추가"
-                      className="flex-1 rounded-lg border px-2 py-1 text-sm"
-                    />
-                    <button
-                      onClick={() => addChild(p)}
-                      className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
-                    >
-                      추가
-                    </button>
+                  {/* 하위 카테고리들 */}
+                  <div className="mt-2 space-y-1 pl-4">
+                    {childrenOf(p.id).length > 0 && (
+                      <SortableList
+                        items={childrenOf(p.id)}
+                        onReorder={reorderGroup}
+                        wrapperClassName="space-y-1"
+                        renderItem={(c, chandle) => (
+                          <div className="flex items-center justify-between border-l-2 pl-1">
+                            <div className="flex items-center gap-1">
+                              <DragHandle handle={chandle} />
+                              {editId === c.id ? (
+                                <input
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  onKeyDown={(e) => e.key === "Enter" && saveRename(c.id)}
+                                  className="rounded-lg border px-2 py-1 text-sm"
+                                  autoFocus
+                                />
+                              ) : (
+                                <span className="text-sm text-gray-700">{c.name}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                              {editId === c.id ? (
+                                <>
+                                  <button onClick={() => saveRename(c.id)} className="font-semibold text-blue-600">저장</button>
+                                  <button onClick={() => setEditId(null)} className="text-gray-400">취소</button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setEditId(c.id);
+                                    setEditName(c.name);
+                                  }}
+                                  className="text-gray-400 hover:text-gray-700"
+                                >
+                                  이름변경
+                                </button>
+                              )}
+                              <button onClick={() => tryDelete(c)} className="text-gray-400 hover:text-red-600">
+                                삭제
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      />
+                    )}
+
+                    {/* 하위 추가 */}
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        value={childInput[p.id] || ""}
+                        onChange={(e) => setChildInput((s) => ({ ...s, [p.id]: e.target.value }))}
+                        onKeyDown={(e) => e.key === "Enter" && addChild(p)}
+                        placeholder="하위 카테고리 추가"
+                        className="flex-1 rounded-lg border px-2 py-1 text-sm"
+                      />
+                      <button
+                        onClick={() => addChild(p)}
+                        className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-200"
+                      >
+                        추가
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              )}
+            />
+          )}
           </>
           )}
         </section>

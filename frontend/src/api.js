@@ -41,6 +41,7 @@ export const accountsApi = {
   create: (payload) => api.post("/api/accounts", payload),
   update: (id, payload) => api.patch(`/api/accounts/${id}`, payload),
   remove: (id) => api.delete(`/api/accounts/${id}`),
+  reorder: (ids) => api.put("/api/accounts/order", { ids }),
 };
 
 // ----------------------------- cards -----------------------------
@@ -49,6 +50,7 @@ export const cardsApi = {
   create: (payload) => api.post("/api/cards", payload),
   update: (id, payload) => api.patch(`/api/cards/${id}`, payload),
   remove: (id) => api.delete(`/api/cards/${id}`),
+  reorder: (ids) => api.put("/api/cards/order", { ids }),
 };
 
 // ----------------------------- categories -----------------------------
@@ -61,6 +63,8 @@ export const categoriesApi = {
     api.delete(`/api/categories/${id}`, {
       params: reassignTo ? { reassign_to: reassignTo } : {},
     }),
+  // 같은 그룹(상위끼리 / 한 부모의 하위끼리) 안에서의 순서를 ids 순서대로 저장
+  reorder: (ids) => api.put("/api/categories/order", { ids }),
 };
 
 // 카테고리 표시명 헬퍼: "상위 > 하위" 또는 "상위"

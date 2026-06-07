@@ -3,6 +3,14 @@ import { accountsApi, cardsApi, categoriesApi, transactionsApi } from "../api";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
+// 거래의 계좌/카드 값을 단일 결제수단 select 값으로 변환
+// "card:<id>" | "account:<id>" | "cash"(지출, 둘 다 없음) | ""(수입, 둘 다 없음)
+const derivePayment = (tx) => {
+  if (tx?.card_id) return `card:${tx.card_id}`;
+  if (tx?.account_id) return `account:${tx.account_id}`;
+  return tx?.type === "income" ? "" : "cash";
+};
+
 export default function TransactionModal({ open, onClose, onSaved, initial, defaultDate }) {
   const editing = Boolean(initial?.id);
   const [accounts, setAccounts] = useState([]);
@@ -19,8 +27,7 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
     category_id: "",
     summary: "",
     description: "",
-    account_id: "",
-    card_id: "",
+    payment: "", // 결제수단: "card:<id>" | "account:<id>" | "cash"
   });
 
   useEffect(() => {
@@ -45,8 +52,7 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
         category_id: initial.category_id ?? "",
         summary: initial.summary ?? "",
         description: initial.description ?? "",
-        account_id: initial.account_id ?? "",
-        card_id: initial.card_id ?? "",
+        payment: derivePayment(initial),
       });
     } else {
       setForm((f) => ({
@@ -56,8 +62,7 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
         category_id: "",
         summary: "",
         description: "",
-        account_id: "",
-        card_id: "",
+        payment: "",
         transaction_date: defaultDate || todayStr(),
       }));
     }
@@ -67,15 +72,16 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  // 수입/지출 전환 시 카테고리 초기화 (타입별로 카테고리가 다름)
-  const changeType = (t) => setForm((f) => ({ ...f, type: t, category_id: "" }));
+  // 수입/지출 전환 시 카테고리·결제수단 초기화 (타입별로 선택지가 다름)
+  const changeType = (t) => setForm((f) => ({ ...f, type: t, category_id: "", payment: "" }));
 
   // ---- 2-depth 카테고리 파생값 ----
+  const byOrder = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0);
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c]));
-  const parents = categories.filter((c) => c.type === form.type && !c.parent_id);
+  const parents = categories.filter((c) => c.type === form.type && !c.parent_id).sort(byOrder);
   const currentCat = catMap[form.category_id];
   const selectedParentId = currentCat ? currentCat.parent_id || currentCat.id : "";
-  const children = categories.filter((c) => c.parent_id === selectedParentId);
+  const children = categories.filter((c) => c.parent_id === selectedParentId).sort(byOrder);
   const selectedChildId = currentCat && currentCat.parent_id ? currentCat.id : "";
 
   const onParentChange = (pid) => set("category_id", pid || ""); // 부모 선택 = 1-depth 지정
@@ -92,6 +98,15 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
       setError("카테고리(상위)를 선택하세요.");
       return;
     }
+    if (!form.payment) {
+      setError(form.type === "income" ? "계좌를 선택하세요." : "결제수단을 선택하세요.");
+      return;
+    }
+    let account_id = null;
+    let card_id = null;
+    if (form.payment.startsWith("account:")) account_id = form.payment.slice(8);
+    else if (form.payment.startsWith("card:")) card_id = form.payment.slice(5);
+    // "cash" → account_id, card_id 모두 null
     const payload = {
       type: form.type,
       amount: parseInt(form.amount, 10),
@@ -99,8 +114,8 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
       category_id: form.category_id || null,
       summary: form.summary.trim() || null,
       description: form.description || null,
-      account_id: form.account_id || null,
-      card_id: form.card_id || null,
+      account_id,
+      card_id,
     };
     setSaving(true);
     try {
@@ -145,6 +160,25 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          {/* 개요 (최상단) */}
+          <div>
+            <label className="mb-1 block text-sm text-gray-600">개요</label>
+            <input
+              type="text"
+              list="summary-suggestions"
+              value={form.summary}
+              onChange={(e) => set("summary", e.target.value)}
+              className="w-full rounded-lg border px-3 py-2"
+              placeholder="예: 점심, 월급, 마트 장보기"
+              autoComplete="off"
+            />
+            <datalist id="summary-suggestions">
+              {summaries.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          </div>
+
           {/* 수입/지출 토글 */}
           <div className="grid grid-cols-2 gap-2">
             {["expense", "income"].map((t) => (
@@ -225,54 +259,34 @@ export default function TransactionModal({ open, onClose, onSaved, initial, defa
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-gray-600">개요</label>
-            <input
-              type="text"
-              list="summary-suggestions"
-              value={form.summary}
-              onChange={(e) => set("summary", e.target.value)}
+            <label className="mb-1 block text-sm text-gray-600">
+              {form.type === "income" ? "계좌" : "결제수단"} <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.payment}
+              onChange={(e) => set("payment", e.target.value)}
+              required
               className="w-full rounded-lg border px-3 py-2"
-              placeholder="예: 점심, 월급, 마트 장보기"
-              autoComplete="off"
-            />
-            <datalist id="summary-suggestions">
-              {summaries.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block text-sm text-gray-600">계좌</label>
-              <select
-                value={form.account_id}
-                onChange={(e) => set("account_id", e.target.value)}
-                className="w-full rounded-lg border px-3 py-2"
-              >
-                <option value="">없음</option>
+            >
+              <option value="">선택</option>
+              {form.type === "expense" && (
+                <optgroup label="카드">
+                  {cards.map((c) => (
+                    <option key={c.id} value={`card:${c.id}`}>
+                      {c.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <optgroup label="계좌">
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
+                  <option key={a.id} value={`account:${a.id}`}>
                     {a.name}
                   </option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm text-gray-600">카드</label>
-              <select
-                value={form.card_id}
-                onChange={(e) => set("card_id", e.target.value)}
-                className="w-full rounded-lg border px-3 py-2"
-              >
-                <option value="">없음</option>
-                {cards.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+              </optgroup>
+              {form.type === "expense" && <option value="cash">현금</option>}
+            </select>
           </div>
 
           <div>

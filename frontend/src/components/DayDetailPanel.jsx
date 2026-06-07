@@ -16,7 +16,6 @@ export default function DayDetailPanel({ date, transactions = [], categories = [
 
   const incomes = transactions.filter((t) => t.type === "income");
   const expenses = transactions.filter((t) => t.type === "expense");
-  const sum = (arr) => arr.reduce((s, t) => s + (t.amount || 0), 0);
 
   const prettyDate = new Date(date + "T00:00:00").toLocaleDateString("ko-KR", {
     year: "numeric",
@@ -48,7 +47,7 @@ export default function DayDetailPanel({ date, transactions = [], categories = [
   );
 
   return (
-    <div className="mt-4 rounded-xl border bg-white p-4">
+    <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-xl border bg-white p-4">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="font-bold text-gray-900">{prettyDate}</h2>
         <button
@@ -59,19 +58,8 @@ export default function DayDetailPanel({ date, transactions = [], categories = [
         </button>
       </div>
 
-      {/* 합계 요약 */}
-      <div className="mb-4 grid grid-cols-2 gap-2 text-center text-sm">
-        <div className="rounded-lg bg-blue-50 py-2">
-          <span className="text-xs text-gray-500">수입</span>
-          <p className="font-bold text-blue-600">{formatWon(sum(incomes))}</p>
-        </div>
-        <div className="rounded-lg bg-red-50 py-2">
-          <span className="text-xs text-gray-500">지출</span>
-          <p className="font-bold text-red-600">{formatWon(sum(expenses))}</p>
-        </div>
-      </div>
-
-      <div className="space-y-4">
+      {/* 목록이 길어지면 이 영역만 세로 스크롤 (헤더는 위에 고정) */}
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         {transactions.length === 0 && (
           <p className="py-8 text-center text-sm text-gray-400">이 날짜에 입력된 거래가 없습니다.</p>
         )}

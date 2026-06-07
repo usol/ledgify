@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from database import supabase_admin
 from middleware import CurrentUser, get_current_user
-from models import CategoryCreate, CategoryUpdate
+from models import CategoryCreate, CategoryUpdate, ReorderRequest
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
 
@@ -30,12 +30,22 @@ def _name_taken(cat_type: str, parent_id: Optional[str], name: str, exclude_id: 
 def list_categories(_: CurrentUser = Depends(get_current_user)):
     res = (
         supabase_admin.table("categories")
-        .select("id, type, name, parent_id, created_at")
+        .select("id, type, name, parent_id, sort_order, created_at")
         .order("type")
+        .order("sort_order")
         .order("name")
         .execute()
     )
     return res.data
+
+
+@router.put("/order")
+def reorder_categories(body: ReorderRequest, _: CurrentUser = Depends(get_current_user)):
+    """같은 그룹(상위끼리 / 한 부모의 하위끼리) 안에서의 노출 순서를 일괄 변경.
+    프론트가 한 그룹의 id 들만 순서대로 보내고, index 가 sort_order 가 된다."""
+    for i, cid in enumerate(body.ids):
+        supabase_admin.table("categories").update({"sort_order": i}).eq("id", cid).execute()
+    return {"message": "순서가 변경되었습니다."}
 
 
 @router.post("", status_code=201)
@@ -64,9 +74,15 @@ def create_category(body: CategoryCreate, _: CurrentUser = Depends(get_current_u
     if _name_taken(cat_type, body.parent_id, name):
         raise HTTPException(status_code=409, detail="같은 위치에 동일한 이름의 카테고리가 이미 있습니다.")
 
+    # 새 카테고리는 같은 그룹(동일 type + parent_id)의 맨 뒤로
+    sib = supabase_admin.table("categories").select("sort_order").eq("type", cat_type)
+    sib = sib.eq("parent_id", body.parent_id) if body.parent_id else sib.is_("parent_id", "null")
+    sib_rows = sib.order("sort_order", desc=True).limit(1).execute().data
+    next_order = (sib_rows[0]["sort_order"] + 1) if sib_rows else 0
+
     res = (
         supabase_admin.table("categories")
-        .insert({"type": cat_type, "name": name, "parent_id": body.parent_id})
+        .insert({"type": cat_type, "name": name, "parent_id": body.parent_id, "sort_order": next_order})
         .execute()
     )
     return res.data[0]

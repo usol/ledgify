@@ -23,6 +23,7 @@ create table if not exists public.accounts (
   user_id    uuid not null references public.profiles(id) on delete cascade,
   name       text not null,
   bank_name  text,
+  sort_order integer not null default 0,   -- 노출 순서(거래 입력 팝업 목록)
   created_at timestamptz not null default now()
 );
 
@@ -37,6 +38,7 @@ create table if not exists public.cards (
   card_type  text not null default 'credit' check (card_type in ('credit', 'debit')),
   issuer     text,
   benefits   text,
+  sort_order integer not null default 0,   -- 노출 순서(거래 입력 팝업 목록)
   created_at timestamptz not null default now()
 );
 
@@ -72,6 +74,7 @@ create table if not exists public.categories (
   type       text not null check (type in ('income', 'expense')),
   name       text not null,
   parent_id  uuid references public.categories(id) on delete cascade,
+  sort_order integer not null default 0,   -- 같은 그룹(상위끼리/한 부모의 하위끼리) 내 노출 순서
   created_at timestamptz not null default now()
 );
 create index if not exists idx_categories_parent on public.categories(parent_id);
@@ -86,6 +89,12 @@ create unique index if not exists uq_categories_child
 alter table public.transactions
   add column if not exists category_id uuid references public.categories(id) on delete set null;
 create index if not exists idx_transactions_category on public.transactions(category_id);
+
+-- 노출 순서(거래 입력 팝업 목록) 컬럼. 기본 0 이며, 정렬 보조키(created_at/name)로
+-- 안정 정렬되므로 별도 백필은 불필요(관리 화면에서 드래그하면 그 그룹에 순서가 부여됨).
+alter table public.accounts   add column if not exists sort_order integer not null default 0;
+alter table public.cards      add column if not exists sort_order integer not null default 0;
+alter table public.categories add column if not exists sort_order integer not null default 0;
 
 -- 기본 상위 카테고리 시드 (테이블이 비어있을 때만)
 insert into public.categories (type, name)

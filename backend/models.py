@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -99,3 +99,9 @@ class CategoryCreate(BaseModel):
 
 class CategoryUpdate(BaseModel):
     name: str
+
+
+# ----------------------------- 정렬(노출 순서) -----------------------------
+class ReorderRequest(BaseModel):
+    """정렬 대상 id 들을 노출 순서대로 담은 목록. index 가 곧 sort_order 가 된다."""
+    ids: List[str]

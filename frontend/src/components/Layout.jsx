@@ -68,7 +68,7 @@ export default function Layout({ children }) {
   );
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen tall:h-screen tall:overflow-hidden">
       {/* 모바일 상단바 */}
       <header className="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b bg-white px-4 py-3 md:hidden">
         <span className="font-bold">공유 가계부</span>
@@ -90,8 +90,8 @@ export default function Layout({ children }) {
         </div>
       )}
 
-      {/* 본문 */}
-      <main className="flex-1 px-4 pb-10 pt-16 md:px-8 md:pt-8">{children}</main>
+      {/* 본문: 기본은 세로 스크롤. 단, h-full 을 쓰는 페이지(캘린더)는 내부에서 스크롤 관리 */}
+      <main className="flex-1 overflow-y-auto px-4 pb-10 pt-16 md:px-8 md:pt-8">{children}</main>
     </div>
   );
 }

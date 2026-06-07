@@ -31,32 +31,27 @@ export default function CalendarGrid({ year, month, byDate = {}, onSelectDate })
         ))}
       </div>
 
-      {/* 날짜 셀 */}
+      {/* 날짜 셀 (높이 고정 + 일자/수입/지출 위치 고정) */}
       <div className="grid grid-cols-7">
         {cells.map((d, idx) => {
-          if (d === null) return <div key={`e${idx}`} className="min-h-[72px] border-b border-r bg-gray-50/50" />;
+          if (d === null) return <div key={`e${idx}`} className="h-[76px] border-b border-r bg-gray-50/50" />;
           const info = byDate[dateKey(d)];
           return (
             <button
               key={d}
               onClick={() => onSelectDate?.(dateKey(d))}
-              className="min-h-[72px] border-b border-r p-1 text-left align-top transition hover:bg-blue-50"
+              className="h-[76px] border-b border-r p-1 text-left align-top transition hover:bg-blue-50"
             >
               <span className="text-xs font-medium text-gray-700">{d}</span>
-              {info && (
-                <div className="mt-1 space-y-0.5">
-                  {info.income > 0 && (
-                    <div className="truncate text-[10px] font-semibold text-blue-600">
-                      +{formatWon(info.income)}
-                    </div>
-                  )}
-                  {info.expense > 0 && (
-                    <div className="truncate text-[10px] font-semibold text-red-600">
-                      -{formatWon(info.expense)}
-                    </div>
-                  )}
+              {/* 수입·지출 줄은 값 유무와 상관없이 항상 자리를 차지 (빈 값은 공백) */}
+              <div className="mt-1 space-y-0.5">
+                <div className="truncate text-[10px] font-semibold text-blue-600">
+                  {info?.income > 0 ? `+${formatWon(info.income)}` : " "}
                 </div>
-              )}
+                <div className="truncate text-[10px] font-semibold text-red-600">
+                  {info?.expense > 0 ? `-${formatWon(info.expense)}` : " "}
+                </div>
+              </div>
             </button>
           );
         })}

@@ -66,7 +66,7 @@ export default function Calendar() {
   const dayRows = selectedDate ? rows.filter((t) => t.transaction_date === selectedDate) : [];
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto flex max-w-4xl flex-col tall:h-full">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={prevMonth} className="rounded-lg border px-3 py-1.5 hover:bg-gray-50">
@@ -81,21 +81,19 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* 월 요약 */}
-      <div className="mb-4 grid grid-cols-3 gap-3">
-        <div className="rounded-xl border bg-white p-4 text-center">
-          <p className="text-xs text-gray-500">수입</p>
-          <p className="mt-1 font-bold text-blue-600">{formatWon(summary.income)}</p>
+      {/* 월 요약 (한 줄로 압축, 일별 집계처럼 배경색) */}
+      <div className="mb-3 grid grid-cols-3 gap-2 text-sm">
+        <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-1.5">
+          <span className="text-xs text-gray-500">수입</span>
+          <span className="font-bold text-blue-600">{formatWon(summary.income)}</span>
         </div>
-        <div className="rounded-xl border bg-white p-4 text-center">
-          <p className="text-xs text-gray-500">지출</p>
-          <p className="mt-1 font-bold text-red-600">{formatWon(summary.expense)}</p>
+        <div className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-1.5">
+          <span className="text-xs text-gray-500">지출</span>
+          <span className="font-bold text-red-600">{formatWon(summary.expense)}</span>
         </div>
-        <div className="rounded-xl border bg-white p-4 text-center">
-          <p className="text-xs text-gray-500">합계</p>
-          <p className={`mt-1 font-bold ${summary.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
-            {formatWon(summary.balance)}
-          </p>
+        <div className="flex items-center justify-between rounded-lg bg-green-50 px-3 py-1.5">
+          <span className="text-xs text-gray-500">합계</span>
+          <span className="font-bold text-green-600">{formatWon(summary.balance)}</span>
         </div>
       </div>
 
